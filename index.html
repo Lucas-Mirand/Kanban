@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full bg-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kanban de Seleção de Fornecedores - SENAI Logística</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        senai: {
+                            blue: '#004587',
+                            lightBlue: '#0072CE',
+                            darkBlue: '#002B54',
+                            accent: '#E30613'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .kanban-col {
+            min-height: 480px;
+        }
+        .dragging {
+            opacity: 0.4;
+            transform: scale(0.97);
+        }
+        .drag-over {
+            border-style: dashed !important;
+            border-width: 2px !important;
+            border-color: #0072CE !important;
+            background-color: rgba(0, 114, 206, 0.08) !important;
+        }
+        /* Custom Scrollbar for smooth Kanban scrolling */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col font-sans text-slate-800 antialiased selection:bg-blue-500 selection:text-white min-h-screen">
+
+    <header class="bg-senai-blue text-white shadow-lg border-b-4 border-senai-accent sticky top-0 z-30 w-full">
+        <div class="w-full px-4 md:px-6 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div class="flex items-center space-x-3">
+                <div class="bg-white text-senai-blue font-extrabold px-3 py-1 rounded-md text-xl tracking-wider shadow">
+                    SENAI
+                </div>
+                <div>
+                    <h1 class="text-base md:text-lg font-bold leading-tight">Logística & Suprimentos</h1>
+                    <p class="text-xs text-blue-200 flex items-center gap-1.5">
+                        <i class="fa-solid fa-boxes-packing"></i>
+                        <span>Atividade Prática: Seleção de Fornecedor para o <strong class="text-white">Produto X</strong></span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Action Controls -->
+            <div class="flex flex-wrap items-center gap-2">
+                <button onclick="openModal('addModal')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-plus"></i> Novo Fornecedor
+                </button>
+                <button onclick="resetData()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 shadow-sm" title="Restaurar dados originais da atividade">
+                    <i class="fa-solid fa-rotate-left"></i> Resetar
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="bg-white border-b border-slate-200 shadow-sm sticky top-[61px] z-20 w-full">
+        <div class="w-full px-4 md:px-6">
+            <nav class="flex space-x-8 overflow-x-auto" aria-label="Tabs">
+                <button onclick="switchTab('kanbanView')" id="tab-kanbanView" class="tab-btn active border-senai-lightBlue text-senai-blue border-b-2 py-2.5 px-1 text-xs sm:text-sm font-semibold flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-table-columns"></i> Quadro Kanban (5 Etapas)
+                </button>
+                <button onclick="switchTab('matrixView')" id="tab-matrixView" class="tab-btn border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 border-b-2 py-2.5 px-1 text-xs sm:text-sm font-semibold flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-chart-simple"></i> Matriz Comparativa Ponderada
+                </button>
+                <button onclick="switchTab('educationalView')" id="tab-educationalView" class="tab-btn border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 border-b-2 py-2.5 px-1 text-xs sm:text-sm font-semibold flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-graduation-cap"></i> Conclusões & Estudo Logístico
+                </button>
+            </nav>
+        </div>
+    </div>
+
+    <main class="flex-1 w-full px-3 md:px-5 py-4 flex flex-col">
+
+        <!-- Banner Desafio SENAI Full Width -->
+        <div class="bg-blue-50 border-l-4 border-senai-lightBlue p-3.5 rounded-r-lg mb-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-100 text-senai-blue p-2 rounded-full shrink-0">
+                    <i class="fa-solid fa-lightbulb text-base"></i>
+                </div>
+                <div>
+                    <h3 class="text-xs sm:text-sm font-bold text-slate-800">Desafio Logístico SENAI - Produto X:</h3>
+                    <p class="text-xs text-slate-600">
+                        Avalie preço, lead time, frete e pagamento de cada fornecedor. Arraste os cards entre as colunas para atualizar a decisão de suprimentos.
+                    </p>
+                </div>
+            </div>
+            <button onclick="switchTab('matrixView')" class="bg-senai-blue hover:bg-senai-lightBlue text-white text-xs font-semibold px-3 py-1.5 rounded transition shrink-0 whitespace-nowrap">
+                Matriz Comparativa <i class="fa-solid fa-arrow-right ml-1"></i>
+            </button>
+        </div>
+
+        <!-- ================= TAB 1: KANBAN BOARD VIEW ================= -->
+        <section id="kanbanView" class="tab-content block flex-1 flex flex-col w-full">
+            <!-- Filter Bar Full Width -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm w-full">
+                <div class="flex items-center space-x-2 text-xs text-slate-500">
+                    <span class="font-semibold text-slate-700"><i class="fa-solid fa-filter text-senai-lightBlue mr-1"></i> Uso do Quadro:</span>
+                    <span>Todas as 5 etapas visíveis na tela. Arraste os cards ou use o menu "Mover".</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="relative">
+                        <i class="fa-solid fa-search absolute left-2.5 top-2 text-xs text-slate-400"></i>
+                        <input type="text" id="searchInput" onkeyup="filterCards()" placeholder="Buscar fornecedor..." class="pl-7 pr-3 py-1 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-48 sm:w-64">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kanban 5-Columns Grid - Occupies 100% screen width without horizontal overflow on desktop -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 w-full items-start flex-1">
+
+                <!-- Column 1: Cotação Aberta -->
+                <div class="bg-slate-200/80 rounded-xl p-2.5 border border-slate-300 flex flex-col h-full min-h-[500px] max-h-[82vh] min-w-0">
+                    <div class="flex items-center justify-between pb-2 mb-2 border-b-2 border-slate-400 shrink-0">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <span class="w-2.5 h-2.5 rounded-full bg-slate-500 shrink-0"></span>
+                            <h2 class="font-bold text-xs text-slate-700 uppercase tracking-wide truncate" title="1. Cotação Aberta">1. Cotação Aberta</h2>
+                        </div>
+                        <span id="count-cotacao" class="bg-slate-300 text-slate-800 text-[11px] font-extrabold px-2 py-0.5 rounded-full shrink-0">0</span>
+                    </div>
+                    <div id="col-cotacao" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="drop(event, 'cotacao')" class="kanban-col space-y-2.5 overflow-y-auto flex-1 pr-1">
+                        <!-- Dynamic cards injected here -->
+                    </div>
+                </div>
+
+                <!-- Column 2: Proposta Recebida -->
+                <div class="bg-blue-50/90 rounded-xl p-2.5 border border-blue-200 flex flex-col h-full min-h-[500px] max-h-[82vh] min-w-0">
+                    <div class="flex items-center justify-between pb-2 mb-2 border-b-2 border-blue-400 shrink-0">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <span class="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0"></span>
+                            <h2 class="font-bold text-xs text-blue-900 uppercase tracking-wide truncate" title="2. Proposta Recebida">2. Proposta Recebida</h2>
+                        </div>
+                        <span id="count-proposta" class="bg-blue-200 text-blue-900 text-[11px] font-extrabold px-2 py-0.5 rounded-full shrink-0">0</span>
+                    </div>
+                    <div id="col-proposta" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="drop(event, 'proposta')" class="kanban-col space-y-2.5 overflow-y-auto flex-1 pr-1">
+                        <!-- Dynamic cards injected here -->
+                    </div>
+                </div>
+
+                <!-- Column 3: Em Análise Comparativa -->
+                <div class="bg-amber-50/90 rounded-xl p-2.5 border border-amber-200 flex flex-col h-full min-h-[500px] max-h-[82vh] min-w-0">
+                    <div class="flex items-center justify-between pb-2 mb-2 border-b-2 border-amber-400 shrink-0">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0"></span>
+                            <h2 class="font-bold text-xs text-amber-900 uppercase tracking-wide truncate" title="3. Em Análise">3. Em Análise</h2>
+                        </div>
+                        <span id="count-analise" class="bg-amber-200 text-amber-900 text-[11px] font-extrabold px-2 py-0.5 rounded-full shrink-0">0</span>
+                    </div>
+                    <div id="col-analise" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="drop(event, 'analise')" class="kanban-col space-y-2.5 overflow-y-auto flex-1 pr-1">
+                        <!-- Dynamic cards injected here -->
+                    </div>
+                </div>
+
+                <!-- Column 4: Decisão Tomada (Homologado) -->
+                <div class="bg-emerald-50/90 rounded-xl p-2.5 border border-emerald-200 flex flex-col h-full min-h-[500px] max-h-[82vh] min-w-0">
+                    <div class="flex items-center justify-between pb-2 mb-2 border-b-2 border-emerald-500 shrink-0">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-600 shrink-0"></span>
+                            <h2 class="font-bold text-xs text-emerald-900 uppercase tracking-wide truncate" title="4. Decisão Tomada">4. Decisão Tomada</h2>
+                        </div>
+                        <span id="count-decisao" class="bg-emerald-200 text-emerald-900 text-[11px] font-extrabold px-2 py-0.5 rounded-full shrink-0">0</span>
+                    </div>
+                    <div id="col-decisao" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="drop(event, 'decisao')" class="kanban-col space-y-2.5 overflow-y-auto flex-1 pr-1">
+                        <!-- Dynamic cards injected here -->
+                    </div>
+                </div>
+
+                <!-- Column 5: Recusado / Arquivado -->
+                <div class="bg-red-50/90 rounded-xl p-2.5 border border-red-200 flex flex-col h-full min-h-[500px] max-h-[82vh] min-w-0">
+                    <div class="flex items-center justify-between pb-2 mb-2 border-b-2 border-red-400 shrink-0">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <span class="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0"></span>
+                            <h2 class="font-bold text-xs text-red-900 uppercase tracking-wide truncate" title="5. Recusado / Arquivado">5. Recusado</h2>
+                        </div>
+                        <span id="count-arquivado" class="bg-red-200 text-red-900 text-[11px] font-extrabold px-2 py-0.5 rounded-full shrink-0">0</span>
+                    </div>
+                    <div id="col-arquivado" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="drop(event, 'arquivado')" class="kanban-col space-y-2.5 overflow-y-auto flex-1 pr-1">
+                        <!-- Dynamic cards injected here -->
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ================= TAB 2: COMPARATIVE MATRIX VIEW ================= -->
+        <section id="matrixView" class="tab-content hidden space-y-4 w-full">
+            <!-- Header & Controls -->
+            <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 w-full">
+                <div>
+                    <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-sliders text-senai-lightBlue"></i> Matriz Multicritério de Avaliação Logística
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Ajuste os pesos dos critérios para recalcular o Score Ponderado em tempo real e fundamentar a decisão.
+                    </p>
+                </div>
+                <div class="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200 shrink-0">
+                    <span class="text-xs font-semibold text-slate-600">Recomendação Automática:</span>
+                    <span id="recommendationBadge" class="bg-emerald-100 text-emerald-800 text-xs font-extrabold px-2.5 py-1 rounded-md border border-emerald-300 flex items-center gap-1">
+                        <i class="fa-solid fa-trophy text-amber-500"></i> Fornecedor C
+                    </span>
+                </div>
+            </div>
+
+            <!-- Weight Adjustment Sliders -->
+            <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+                <div>
+                    <div class="flex justify-between text-xs font-bold text-slate-700 mb-1">
+                        <label for="weightPrice"><i class="fa-solid fa-tag text-blue-600 mr-1"></i> Preço Unitário</label>
+                        <span id="weightPriceVal" class="text-blue-600">35%</span>
+                    </div>
+                    <input type="range" id="weightPrice" min="0" max="100" value="35" oninput="updateWeights()" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                </div>
+                <div>
+                    <div class="flex justify-between text-xs font-bold text-slate-700 mb-1">
+                        <label for="weightLead"><i class="fa-solid fa-truck-fast text-amber-600 mr-1"></i> Lead Time (Prazo)</label>
+                        <span id="weightLeadVal" class="text-amber-600">30%</span>
+                    </div>
+                    <input type="range" id="weightLead" min="0" max="100" value="30" oninput="updateWeights()" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-600">
+                </div>
+                <div>
+                    <div class="flex justify-between text-xs font-bold text-slate-700 mb-1">
+                        <label for="weightFreight"><i class="fa-solid fa-box text-purple-600 mr-1"></i> Frete (CIF vs FOB)</label>
+                        <span id="weightFreightVal" class="text-purple-600">20%</span>
+                    </div>
+                    <input type="range" id="weightFreight" min="0" max="100" value="20" oninput="updateWeights()" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600">
+                </div>
+                <div>
+                    <div class="flex justify-between text-xs font-bold text-slate-700 mb-1">
+                        <label for="weightPayment"><i class="fa-solid fa-wallet text-emerald-600 mr-1"></i> Prazo de Pagamento</label>
+                        <span id="weightPaymentVal" class="text-emerald-600">15%</span>
+                    </div>
+                    <input type="range" id="weightPayment" min="0" max="100" value="15" oninput="updateWeights()" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600">
+                </div>
+            </div>
+
+            <!-- Comparison Table -->
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden w-full">
+                <div class="overflow-x-auto w-full">
+                    <table class="w-full text-left text-xs md:text-sm border-collapse min-w-[700px]">
+                        <thead>
+                            <tr class="bg-slate-800 text-white font-semibold">
+                                <th class="p-3 border-b border-slate-700">Fornecedor</th>
+                                <th class="p-3 border-b border-slate-700">Preço Unit.</th>
+                                <th class="p-3 border-b border-slate-700">Lead Time</th>
+                                <th class="p-3 border-b border-slate-700">Modalidade Frete</th>
+                                <th class="p-3 border-b border-slate-700">Condição Pagamento</th>
+                                <th class="p-3 border-b border-slate-700">Status Atual</th>
+                                <th class="p-3 border-b border-slate-700 text-center">Score Ponderado</th>
+                                <th class="p-3 border-b border-slate-700 text-right">Ação Direta</th>
+                            </tr>
+                        </thead>
+                        <tbody id="matrixTableBody" class="divide-y divide-slate-200">
+                            <!-- Dynamic Table Rows Injected Here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Detailed Breakdown Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full" id="matrixCardsContainer">
+                <!-- Injected via JavaScript -->
+            </div>
+        </section>
+
+        <!-- ================= TAB 3: EDUCATIONAL / SENAI CONCLUSIONS ================= -->
+        <section id="educationalView" class="tab-content hidden space-y-4 w-full">
+            <div class="bg-gradient-to-r from-senai-darkBlue to-senai-blue text-white rounded-2xl p-5 shadow-md w-full">
+                <div class="max-w-4xl">
+                    <span class="bg-senai-accent text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                        Relatório Técnico SENAI
+                    </span>
+                    <h2 class="text-xl font-extrabold mt-2 mb-1">Como o Kanban Prova a Facilitação na Tomada de Decisão Logística?</h2>
+                    <p class="text-xs sm:text-sm text-blue-100 leading-relaxed">
+                        A escolha de fornecedores sem um método visual padronizado gera retrabalho, perda de dados e decisões focadas apenas no menor preço de aquisição — ignorando o impacto do tempo de resposta, frete e fluxo de caixa.
+                    </p>
+                </div>
+            </div>
+
+            <!-- 4 Proof Pillars Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+
+                <!-- Pillar 1 -->
+                <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
+                    <div class="flex items-center gap-2.5 mb-2">
+                        <div class="w-8 h-8 rounded-lg bg-blue-100 text-senai-blue flex items-center justify-center font-bold text-sm shrink-0">
+                            1
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-xs sm:text-sm">Gestão Visual</h3>
+                            <span class="text-[11px] text-blue-600 font-medium">Transparência Total</span>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        O quadro expõe o exato estágio de cada cotação do <strong>Produto X</strong>. Toda a equipe visualiza quem enviou proposta, quem está em análise e quem foi homologado.
+                    </p>
+                </div>
+
+                <!-- Pillar 2 -->
+                <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
+                    <div class="flex items-center gap-2.5 mb-2">
+                        <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-sm shrink-0">
+                            2
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-xs sm:text-sm">Padronização</h3>
+                            <span class="text-[11px] text-amber-600 font-medium">Custo Total de Aquisição</span>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        Em vez de escolher só pelo preço nominal (onde o Fornecedor A aparenta ser o mais barato por R$ 90,00), o cartão exige comparar Lead Time (20 dias!) e Frete FOB.
+                    </p>
+                </div>
+
+                <!-- Pillar 3 -->
+                <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
+                    <div class="flex items-center gap-2.5 mb-2">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm shrink-0">
+                            3
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-xs sm:text-sm">Gargalos Visualizados</h3>
+                            <span class="text-[11px] text-emerald-600 font-medium">Lead Time Comercial</span>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        Cards retidos na coluna <em>"Cotação Aberta"</em> sinalizam fornecedores lentos no atendimento, alertando o setor de compras sobre potenciais riscos.
+                    </p>
+                </div>
+
+                <!-- Pillar 4 -->
+                <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
+                    <div class="flex items-center gap-2.5 mb-2">
+                        <div class="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm shrink-0">
+                            4
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-xs sm:text-sm">Governança & Historico</h3>
+                            <span class="text-[11px] text-purple-600 font-medium">Compliance em Compras</span>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        Ao mover para <em>"Recusado"</em>, grava-se a justificativa técnica. Isso garante auditoria clara para reuniões de alinhamento com a diretoria.
+                    </p>
+                </div>
+
+            </div>
+
+            <!-- Case Study Synthesis Table -->
+            <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm w-full">
+                <h3 class="text-xs sm:text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-list-check text-senai-lightBlue"></i> Resumo Comparativo do Produto X para Defesa na Atividade
+                </h3>
+                <div class="space-y-2.5 text-xs text-slate-600 w-full">
+                    <div class="p-2.5 bg-red-50 border border-red-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                            <strong class="text-red-900 font-semibold">Fornecedor A (Armadilha do Preço Baixo):</strong> Preço R$ 90,00 é atraente, mas prazo de 20 dias paralisa o estoque e o Frete FOB encarece o transporte.
+                        </div>
+                        <span class="bg-red-200 text-red-800 px-2 py-0.5 rounded font-bold shrink-0 text-[11px]">Recusado</span>
+                    </div>
+
+                    <div class="p-2.5 bg-amber-50 border border-amber-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                            <strong class="text-amber-900 font-semibold">Fornecedor B (Prazo Rápido, Preço Alto):</strong> Entrega em 4 dias e 60 dias para pagar, contudo o preço de R$ 115,00 estoura o orçamento estipulado.
+                        </div>
+                        <span class="bg-amber-200 text-amber-800 px-2 py-0.5 rounded font-bold shrink-0 text-[11px]">Segunda Opção</span>
+                    </div>
+
+                    <div class="p-2.5 bg-emerald-50 border border-emerald-300 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                            <strong class="text-emerald-900 font-semibold">Fornecedor C (Melhor Equilíbrio Total / VENCEDOR):</strong> Preço R$ 95,00, Frete CIF (entregue), entrega rápida em 5 dias e 30 dias para pagamento.
+                        </div>
+                        <span class="bg-emerald-600 text-white px-2 py-0.5 rounded font-bold shrink-0 text-[11px]"><i class="fa-solid fa-check mr-1"></i> Homologado</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL: DETALHES / EDITAR CARD -->
+    <div id="cardModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden border border-slate-200 transform transition-all">
+            <div class="bg-senai-blue px-5 py-3.5 text-white flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-truck-ramp-box"></i>
+                    <h3 id="modalTitle" class="font-bold text-sm md:text-base">Detalhes do Fornecedor</h3>
+                </div>
+                <button onclick="closeModal('cardModal')" class="text-slate-300 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <div class="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto" id="modalBody">
+                <!-- Dynamically filled -->
+            </div>
+
+            <div class="bg-slate-50 px-5 py-3 border-t border-slate-200 flex justify-between items-center">
+                <button onclick="deleteCurrentCard()" class="text-red-600 hover:text-red-800 text-xs font-semibold flex items-center gap-1">
+                    <i class="fa-solid fa-trash"></i> Excluir Card
+                </button>
+                <div class="flex gap-2">
+                    <button onclick="closeModal('cardModal')" class="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-lg">
+                        Cancelar
+                    </button>
+                    <button onclick="saveCardChanges()" class="px-3.5 py-1.5 bg-senai-blue hover:bg-senai-lightBlue text-white text-xs font-semibold rounded-lg">
+                        Salvar Alterações
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ADICIONAR NOVO FORNECEDOR -->
+    <div id="addModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden border border-slate-200">
+            <div class="bg-emerald-700 px-5 py-3.5 text-white flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-plus-circle"></i>
+                    <h3 class="font-bold text-sm md:text-base">Cadastrar Cotação de Fornecedor</h3>
+                </div>
+                <button onclick="closeModal('addModal')" class="text-slate-300 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <form id="addSupplierForm" onsubmit="handleAddSupplier(event)" class="p-5 space-y-3 text-xs">
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Nome do Fornecedor *</label>
+                    <input type="text" id="newCardName" required placeholder="Ex: Fornecedor D - Logística S/A" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Preço Unitário (R$) *</label>
+                        <input type="number" step="0.01" id="newCardPrice" required placeholder="99.90" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Lead Time (Dias) *</label>
+                        <input type="number" id="newCardLead" required placeholder="7" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Modalidade Frete *</label>
+                        <select id="newCardFreight" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                            <option value="CIF">CIF (Emitente paga)</option>
+                            <option value="FOB">FOB (Destinatário paga)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Condição de Pagamento *</label>
+                        <select id="newCardPayment" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                            <option value="À vista">À vista</option>
+                            <option value="15 dias">15 dias</option>
+                            <option value="30 dias">30 dias</option>
+                            <option value="60 dias">60 dias</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Coluna Inicial no Kanban</label>
+                    <select id="newCardStatus" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                        <option value="cotacao">1. Cotação Aberta</option>
+                        <option value="proposta">2. Proposta Recebida</option>
+                        <option value="analise" selected>3. Em Análise Comparativa</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Observações Gerais / Anotações</label>
+                    <textarea id="newCardNotes" rows="2" placeholder="Informações adicionais sobre capacidade de produção, qualidade, etc." class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"></textarea>
+                </div>
+
+                <div class="pt-2 flex justify-end gap-2 border-t border-slate-200">
+                    <button type="button" onclick="closeModal('addModal')" class="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-lg">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white font-semibold rounded-lg shadow-sm">
+                        Adicionar ao Quadro
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const initialCards = [
+            {
+                id: "card-A",
+                name: "Fornecedor A",
+                product: "Produto X",
+                price: 90.00,
+                leadTime: 20,
+                freight: "FOB",
+                payment: "À vista",
+                status: "analise",
+                notes: "Menor preço nominal unitário. Porém o frete é FOB e o lead time de 20 dias compromete a linha de produção.",
+                rejectionReason: "Lead time excessivo de 20 dias e condição de pagamento à vista."
+            },
+            {
+                id: "card-B",
+                name: "Fornecedor B",
+                product: "Produto X",
+                price: 115.00,
+                leadTime: 4,
+                freight: "CIF",
+                payment: "60 dias",
+                status: "analise",
+                notes: "Excelente prazo de entrega (4 dias) e pagamento em 60 dias. Contudo, preço R$ 115,00 está 21% acima do Fornecedor C.",
+                rejectionReason: "Preço muito elevado para o orçamento estipulado."
+            },
+            {
+                id: "card-C",
+                name: "Fornecedor C",
+                product: "Produto X",
+                price: 95.00,
+                leadTime: 5,
+                freight: "CIF",
+                payment: "30 dias",
+                status: "decisao",
+                notes: "Proposta mais equilibrada: Preço competitivo (R$ 95,00), frete CIF incluso, entrega rápida em 5 dias e 30 dias para pagamento. RECOMENDADO!",
+                rejectionReason: ""
+            }
+        ];
+
+        let cards = JSON.parse(localStorage.getItem('senai_kanban_cards')) || [...initialCards];
+        let activeCardId = null;
+
+        // Weights for score calculation (%)
+        let weights = {
+            price: 35,
+            lead: 30,
+            freight: 20,
+            payment: 15
+        };
+
+        function renderBoard() {
+            const columns = ['cotacao', 'proposta', 'analise', 'decisao', 'arquivado'];
+            
+            // Clear all column elements
+            columns.forEach(col => {
+                const container = document.getElementById(`col-${col}`);
+                if (container) container.innerHTML = '';
+                const countEl = document.getElementById(`count-${col}`);
+                if (countEl) countEl.innerText = '0';
+            });
+
+            // Group counters
+            const counts = { cotacao: 0, proposta: 0, analise: 0, decisao: 0, arquivado: 0 };
+
+            cards.forEach(card => {
+                const colId = card.status || 'cotacao';
+                counts[colId] = (counts[colId] || 0) + 1;
+
+                const score = calculateScore(card);
+                const colContainer = document.getElementById(`col-${colId}`);
+
+                if (colContainer) {
+                    const cardElement = document.createElement('div');
+                    cardElement.className = `bg-white rounded-xl p-2.5 shadow-sm border border-slate-200 hover:shadow-md transition cursor-grab relative group w-full box-border min-w-0`;
+                    cardElement.draggable = true;
+                    cardElement.id = card.id;
+
+                    // Drag event bindings
+                    cardElement.addEventListener('dragstart', (e) => dragStart(e, card.id));
+                    cardElement.addEventListener('dragend', dragEnd);
+
+                    // Winner Badge visual highlight if Supplier C or top score
+                    const isWinner = card.id === 'card-C' || score >= 4.5;
+                    const borderStyle = card.status === 'decisao' ? 'border-l-4 border-l-emerald-500' : 
+                                      (card.status === 'arquivado' ? 'border-l-4 border-l-red-400' : 'border-l-4 border-l-senai-lightBlue');
+
+                    cardElement.className += ` ${borderStyle}`;
+
+                    cardElement.innerHTML = `
+                        <div class="flex items-start justify-between gap-1 mb-1.5">
+                            <div class="min-w-0 flex-1">
+                                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wide block truncate">Produto X</span>
+                                <h3 class="font-bold text-xs text-slate-800 leading-tight truncate flex items-center gap-1" title="${card.name}">
+                                    ${card.name}
+                                    ${isWinner && card.status === 'decisao' ? '<i class="fa-solid fa-award text-amber-500 shrink-0" title="Vencedor Homologado"></i>' : ''}
+                                </h3>
+                            </div>
+                            <span class="text-[10px] font-extrabold ${score >= 4.0 ? 'bg-emerald-100 text-emerald-800' : (score >= 3.0 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800')} px-1.5 py-0.5 rounded-full shrink-0">
+                                ★ ${score.toFixed(1)}
+                            </span>
+                        </div>
+
+                        <!-- Card Specs Grid - Compact layout to fit tight column widths -->
+                        <div class="grid grid-cols-2 gap-1 text-[11px] text-slate-600 my-1.5 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                            <div class="truncate">
+                                <span class="text-[9px] text-slate-400 block font-medium">Preço:</span>
+                                <strong class="text-slate-800 text-[11px]">R$ ${card.price.toFixed(2)}</strong>
+                            </div>
+                            <div class="truncate">
+                                <span class="text-[9px] text-slate-400 block font-medium">Lead Time:</span>
+                                <strong class="${card.leadTime > 10 ? 'text-red-600 font-bold' : 'text-slate-800'} text-[11px]">${card.leadTime}d</strong>
+                            </div>
+                            <div class="truncate">
+                                <span class="text-[9px] text-slate-400 block font-medium">Frete:</span>
+                                <span class="inline-block px-1 py-0.2 text-[9px] font-bold rounded ${card.freight === 'CIF' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-800'}">${card.freight}</span>
+                            </div>
+                            <div class="truncate">
+                                <span class="text-[9px] text-slate-400 block font-medium">Pagamento:</span>
+                                <span class="text-slate-700 font-medium text-[10px]">${card.payment}</span>
+                            </div>
+                        </div>
+
+                        ${card.notes ? `<p class="text-[10px] text-slate-500 line-clamp-2 italic mb-2 leading-tight">"${card.notes}"</p>` : ''}
+
+                        <!-- Quick actions footer with full wrap safety -->
+                        <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-1 text-[10px] w-full">
+                            <button onclick="openCardDetails('${card.id}')" class="text-senai-lightBlue hover:text-senai-blue font-semibold flex items-center gap-1 text-[10px] shrink-0 py-0.5">
+                                <i class="fa-solid fa-eye text-[10px]"></i> <span>Detalhes</span>
+                            </button>
+                            
+                            <!-- Move dropdown with controlled width -->
+                            <div class="shrink-0 w-full sm:w-auto max-w-full">
+                                <select onchange="moveCardViaSelect('${card.id}', this.value)" class="w-full text-[10px] bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium rounded px-1 py-0.5 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer">
+                                    <option value="" disabled selected>Mover...</option>
+                                    <option value="cotacao" ${card.status === 'cotacao' ? 'disabled' : ''}>1. Cotação</option>
+                                    <option value="proposta" ${card.status === 'proposta' ? 'disabled' : ''}>2. Proposta</option>
+                                    <option value="analise" ${card.status === 'analise' ? 'disabled' : ''}>3. Análise</option>
+                                    <option value="decisao" ${card.status === 'decisao' ? 'disabled' : ''}>4. Decisão</option>
+                                    <option value="arquivado" ${card.status === 'arquivado' ? 'disabled' : ''}>5. Recusado</option>
+                                </select>
+                            </div>
+                        </div>
+                    `;
+
+                    colContainer.appendChild(cardElement);
+                }
+            });
+
+            // Update Counters
+            columns.forEach(col => {
+                const countEl = document.getElementById(`count-${col}`);
+                if (countEl) countEl.innerText = counts[col] || 0;
+            });
+
+            saveToLocalStorage();
+            renderMatrix();
+        }
+
+        function dragStart(e, cardId) {
+            e.dataTransfer.setData('text/plain', cardId);
+            e.target.classList.add('dragging');
+        }
+
+        function dragEnd(e) {
+            e.target.classList.remove('dragging');
+        }
+
+        function allowDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('drag-over');
+        }
+
+        function dragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        function drop(e, targetStatus) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+            const cardId = e.dataTransfer.getData('text/plain');
+            
+            const card = cards.find(c => c.id === cardId);
+            if (card) {
+                card.status = targetStatus;
+                renderBoard();
+            }
+        }
+
+        function moveCardViaSelect(cardId, newStatus) {
+            if (!newStatus) return;
+            const card = cards.find(c => c.id === cardId);
+            if (card) {
+                card.status = newStatus;
+                renderBoard();
+            }
+        }
+
+        function calculateScore(card) {
+            // Price score: R$ 90 = 5.0, R$ 115 = 2.0
+            const minPrice = 85;
+            const maxPrice = 125;
+            let priceScore = 5 - ((card.price - minPrice) / (maxPrice - minPrice)) * 4;
+            priceScore = Math.max(1, Math.min(5, priceScore));
+
+            // Lead time score: 4 days = 5.0, 20 days = 1.0
+            let leadScore = card.leadTime <= 5 ? 5 : (card.leadTime <= 10 ? 3.5 : 1.5);
+
+            // Freight score: CIF = 5.0, FOB = 2.0
+            let freightScore = card.freight === 'CIF' ? 5 : 2;
+
+            // Payment terms score: 60d = 5.0, 30d = 4.0, À vista = 1.5
+            let payScore = 2;
+            if (card.payment.includes('60')) payScore = 5;
+            else if (card.payment.includes('30')) payScore = 4;
+            else if (card.payment.includes('15')) payScore = 3;
+            else if (card.payment.toLowerCase().includes('vista')) payScore = 1.5;
+
+            // Weighted average
+            const totalWeight = weights.price + weights.lead + weights.freight + weights.payment;
+            if (totalWeight === 0) return 3.0;
+
+            const finalScore = (
+                (priceScore * weights.price) +
+                (leadScore * weights.lead) +
+                (freightScore * weights.freight) +
+                (payScore * weights.payment)
+            ) / totalWeight;
+
+            return Math.round(finalScore * 10) / 10;
+        }
+
+        function renderMatrix() {
+            const tableBody = document.getElementById('matrixTableBody');
+            const cardsContainer = document.getElementById('matrixCardsContainer');
+            if (!tableBody) return;
+
+            tableBody.innerHTML = '';
+            if (cardsContainer) cardsContainer.innerHTML = '';
+
+            let highestScore = -1;
+            let recommendedSupplier = null;
+
+            cards.forEach(card => {
+                const score = calculateScore(card);
+                if (score > highestScore) {
+                    highestScore = score;
+                    recommendedSupplier = card;
+                }
+            });
+
+            // Update badge recommendation
+            const recBadge = document.getElementById('recommendationBadge');
+            if (recBadge && recommendedSupplier) {
+                recBadge.innerHTML = `<i class="fa-solid fa-trophy text-amber-500 mr-1"></i> ${recommendedSupplier.name} (${highestScore.toFixed(1)})`;
+            }
+
+            cards.forEach(card => {
+                const score = calculateScore(card);
+                const isRecommended = recommendedSupplier && recommendedSupplier.id === card.id;
+
+                // Table Row Injection
+                const tr = document.createElement('tr');
+                tr.className = isRecommended ? 'bg-emerald-50/70 font-semibold' : 'hover:bg-slate-50';
+
+                const statusBadges = {
+                    cotacao: '<span class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-[11px]">1. Cotação</span>',
+                    proposta: '<span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-[11px]">2. Proposta</span>',
+                    analise: '<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[11px]">3. Em Análise</span>',
+                    decisao: '<span class="bg-emerald-600 text-white px-2 py-0.5 rounded text-[11px] font-bold">4. Decisão</span>',
+                    arquivado: '<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded text-[11px]">5. Recusado</span>'
+                };
+
+                tr.innerHTML = `
+                    <td class="p-3 border-b border-slate-200">
+                        <div class="flex items-center gap-2">
+                            <strong class="text-slate-800">${card.name}</strong>
+                            ${isRecommended ? '<span class="bg-emerald-500 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded">RECOMENDADO</span>' : ''}
+                        </div>
+                    </td>
+                    <td class="p-3 border-b border-slate-200">R$ ${card.price.toFixed(2)}</td>
+                    <td class="p-3 border-b border-slate-200 ${card.leadTime > 10 ? 'text-red-600 font-bold' : ''}">${card.leadTime} dias</td>
+                    <td class="p-3 border-b border-slate-200"><span class="px-2 py-0.5 rounded text-xs font-bold ${card.freight === 'CIF' ? 'bg-emerald-100 text-emerald-800' : 'bg-orange-100 text-orange-800'}">${card.freight}</span></td>
+                    <td class="p-3 border-b border-slate-200">${card.payment}</td>
+                    <td class="p-3 border-b border-slate-200">${statusBadges[card.status] || ''}</td>
+                    <td class="p-3 border-b border-slate-200 text-center">
+                        <span class="text-xs font-extrabold px-2 py-1 rounded-full ${score >= 4.0 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : (score >= 3.0 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800')}">
+                            ${score.toFixed(1)} / 5.0
+                        </span>
+                    </td>
+                    <td class="p-3 border-b border-slate-200 text-right">
+                        ${card.status !== 'decisao' ? `
+                            <button onclick="approveSupplier('${card.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1 rounded-lg transition font-medium">
+                                Homologar <i class="fa-solid fa-check ml-1"></i>
+                            </button>
+                        ` : `
+                            <span class="text-emerald-700 text-xs font-bold flex items-center justify-end gap-1">
+                                <i class="fa-solid fa-circle-check"></i> Selecionado
+                            </span>
+                        `}
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+
+                // Detailed matrix card injection
+                if (cardsContainer) {
+                    const mCard = document.createElement('div');
+                    mCard.className = `bg-white rounded-xl p-4 border ${isRecommended ? 'border-2 border-emerald-500 ring-2 ring-emerald-100' : 'border-slate-200'} shadow-sm flex flex-col justify-between`;
+                    mCard.innerHTML = `
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="font-bold text-slate-800 text-sm md:text-base">${card.name}</h3>
+                                <span class="text-xs font-extrabold px-2 py-0.5 rounded ${isRecommended ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}">
+                                    Score: ${score.toFixed(1)}
+                                </span>
+                            </div>
+                            <div class="space-y-1.5 text-xs text-slate-600 mb-3">
+                                <div class="flex justify-between border-b pb-1">
+                                    <span class="text-slate-400">Preço Unitário:</span>
+                                    <span class="font-semibold text-slate-800">R$ ${card.price.toFixed(2)}</span>
+                                </div>
+                                <div class="flex justify-between border-b pb-1">
+                                    <span class="text-slate-400">Prazo de Entrega:</span>
+                                    <span class="font-semibold ${card.leadTime > 10 ? 'text-red-600 font-bold' : 'text-slate-800'}">${card.leadTime} dias</span>
+                                </div>
+                                <div class="flex justify-between border-b pb-1">
+                                    <span class="text-slate-400">Modalidade Frete:</span>
+                                    <span class="font-semibold text-slate-800">${card.freight}</span>
+                                </div>
+                                <div class="flex justify-between border-b pb-1">
+                                    <span class="text-slate-400">Pagamento:</span>
+                                    <span class="font-semibold text-slate-800">${card.payment}</span>
+                                </div>
+                            </div>
+                            <p class="text-xs text-slate-500 italic bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                "${card.notes || 'Sem observações adicionais.'}"
+                            </p>
+                        </div>
+                        <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+                            <button onclick="openCardDetails('${card.id}')" class="text-xs text-senai-lightBlue hover:underline font-medium">
+                                <i class="fa-solid fa-pen-to-square"></i> Editar Dados
+                            </button>
+                            ${card.status !== 'decisao' ? `
+                                <button onclick="approveSupplier('${card.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1 rounded-lg transition font-medium">
+                                    Aprovar
+                                </button>
+                            ` : '<span class="text-xs text-emerald-600 font-bold"><i class="fa-solid fa-check-double mr-1"></i> Homologado</span>'}
+                        </div>
+                    `;
+                    cardsContainer.appendChild(mCard);
+                }
+            });
+        }
+
+        function updateWeights() {
+            weights.price = parseInt(document.getElementById('weightPrice').value) || 0;
+            weights.lead = parseInt(document.getElementById('weightLead').value) || 0;
+            weights.freight = parseInt(document.getElementById('weightFreight').value) || 0;
+            weights.payment = parseInt(document.getElementById('weightPayment').value) || 0;
+
+            document.getElementById('weightPriceVal').innerText = weights.price + '%';
+            document.getElementById('weightLeadVal').innerText = weights.lead + '%';
+            document.getElementById('weightFreightVal').innerText = weights.freight + '%';
+            document.getElementById('weightPaymentVal').innerText = weights.payment + '%';
+
+            renderBoard();
+        }
+
+        function approveSupplier(cardId) {
+            cards.forEach(c => {
+                if (c.id === cardId) {
+                    c.status = 'decisao';
+                } else if (c.status === 'decisao') {
+                    // Downgrade previously approved to analysis
+                    c.status = 'analise';
+                }
+            });
+            renderBoard();
+        }
+
+        function openCardDetails(cardId) {
+            const card = cards.find(c => c.id === cardId);
+            if (!card) return;
+            activeCardId = cardId;
+
+            const modalTitle = document.getElementById('modalTitle');
+            const modalBody = document.getElementById('modalBody');
+
+            modalTitle.innerText = `Editar: ${card.name}`;
+
+            modalBody.innerHTML = `
+                <div class="space-y-3 text-xs">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Nome do Fornecedor</label>
+                        <input type="text" id="editName" value="${card.name}" class="w-full p-2 border border-slate-300 rounded-lg">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-1">Preço Unitário (R$)</label>
+                            <input type="number" step="0.01" id="editPrice" value="${card.price}" class="w-full p-2 border border-slate-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-1">Lead Time (Dias)</label>
+                            <input type="number" id="editLead" value="${card.leadTime}" class="w-full p-2 border border-slate-300 rounded-lg">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-1">Frete</label>
+                            <select id="editFreight" class="w-full p-2 border border-slate-300 rounded-lg bg-white">
+                                <option value="CIF" ${card.freight === 'CIF' ? 'selected' : ''}>CIF</option>
+                                <option value="FOB" ${card.freight === 'FOB' ? 'selected' : ''}>FOB</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-1">Pagamento</label>
+                            <select id="editPayment" class="w-full p-2 border border-slate-300 rounded-lg bg-white">
+                                <option value="À vista" ${card.payment === 'À vista' ? 'selected' : ''}>À vista</option>
+                                <option value="15 dias" ${card.payment === '15 dias' ? 'selected' : ''}>15 dias</option>
+                                <option value="30 dias" ${card.payment === '30 dias' ? 'selected' : ''}>30 dias</option>
+                                <option value="60 dias" ${card.payment === '60 dias' ? 'selected' : ''}>60 dias</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Status no Kanban</label>
+                        <select id="editStatus" class="w-full p-2 border border-slate-300 rounded-lg bg-white">
+                            <option value="cotacao" ${card.status === 'cotacao' ? 'selected' : ''}>1. Cotação Aberta</option>
+                            <option value="proposta" ${card.status === 'proposta' ? 'selected' : ''}>2. Proposta Recebida</option>
+                            <option value="analise" ${card.status === 'analise' ? 'selected' : ''}>3. Em Análise</option>
+                            <option value="decisao" ${card.status === 'decisao' ? 'selected' : ''}>4. Decisão Tomada</option>
+                            <option value="arquivado" ${card.status === 'arquivado' ? 'selected' : ''}>5. Recusado / Arquivado</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Anotações / Observações Logísticas</label>
+                        <textarea id="editNotes" rows="3" class="w-full p-2 border border-slate-300 rounded-lg">${card.notes || ''}</textarea>
+                    </div>
+                </div>
+            `;
+
+            openModal('cardModal');
+        }
+
+        function saveCardChanges() {
+            if (!activeCardId) return;
+            const card = cards.find(c => c.id === activeCardId);
+            if (card) {
+                card.name = document.getElementById('editName').value;
+                card.price = parseFloat(document.getElementById('editPrice').value) || 0;
+                card.leadTime = parseInt(document.getElementById('editLead').value) || 0;
+                card.freight = document.getElementById('editFreight').value;
+                card.payment = document.getElementById('editPayment').value;
+                card.status = document.getElementById('editStatus').value;
+                card.notes = document.getElementById('editNotes').value;
+
+                renderBoard();
+                closeModal('cardModal');
+            }
+        }
+
+        function deleteCurrentCard() {
+            if (!activeCardId) return;
+            cards = cards.filter(c => c.id !== activeCardId);
+            renderBoard();
+            closeModal('cardModal');
+        }
+
+        function handleAddSupplier(e) {
+            e.preventDefault();
+            const newCard = {
+                id: "card-" + Date.now(),
+                name: document.getElementById('newCardName').value,
+                product: "Produto X",
+                price: parseFloat(document.getElementById('newCardPrice').value) || 0,
+                leadTime: parseInt(document.getElementById('newCardLead').value) || 0,
+                freight: document.getElementById('newCardFreight').value,
+                payment: document.getElementById('newCardPayment').value,
+                status: document.getElementById('newCardStatus').value,
+                notes: document.getElementById('newCardNotes').value,
+                rejectionReason: ""
+            };
+
+            cards.push(newCard);
+            renderBoard();
+            closeModal('addModal');
+            document.getElementById('addSupplierForm').reset();
+        }
+
+        function filterCards() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            cards.forEach(card => {
+                const cardEl = document.getElementById(card.id);
+                if (cardEl) {
+                    const match = card.name.toLowerCase().includes(query) || 
+                                  card.notes.toLowerCase().includes(query) ||
+                                  card.freight.toLowerCase().includes(query);
+                    cardEl.style.display = match ? 'block' : 'none';
+                }
+            });
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active', 'border-senai-lightBlue', 'text-senai-blue');
+                btn.classList.add('border-transparent', 'text-slate-500');
+            });
+
+            const selectedContent = document.getElementById(tabId);
+            if (selectedContent) selectedContent.classList.remove('hidden');
+
+            const selectedTab = document.getElementById(`tab-${tabId}`);
+            if (selectedTab) {
+                selectedTab.classList.add('active', 'border-senai-lightBlue', 'text-senai-blue');
+                selectedTab.classList.remove('border-transparent', 'text-slate-500');
+            }
+
+            if (tabId === 'matrixView') {
+                renderMatrix();
+            }
+        }
+
+        function openModal(modalId) {
+            const m = document.getElementById(modalId);
+            if (m) m.classList.remove('hidden');
+        }
+
+        function closeModal(modalId) {
+            const m = document.getElementById(modalId);
+            if (m) m.classList.add('hidden');
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem('senai_kanban_cards', JSON.stringify(cards));
+        }
+
+        function resetData() {
+            cards = JSON.parse(JSON.stringify(initialCards));
+            localStorage.removeItem('senai_kanban_cards');
+            renderBoard();
+        }
+
+        window.onload = function() {
+            renderBoard();
+        };
+    </script>
+</body>
+</html>
